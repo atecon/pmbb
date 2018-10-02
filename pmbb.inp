@@ -1,0 +1,175 @@
+# public functions
+function bundle pmbbNEW (series y "dependent variable",
+                      list X "regressors (w/o constant)",
+                      int l[1:50:4] "block size",
+                      int B[100:10000:1000] "bootstrap replications",
+                      int pseed[0:100000:0] "seed (0 = auto)")
+    #set the seed
+    if pseed
+        set seed pseed
+    endif
+    #estimate
+    panel y 0 X --quiet
+    #coefficients
+    matrix b = transp($coeff[2:])
+    #number of obs
+    scalar nT = $T
+    #cross-sectional units
+    scalar n = max($unit)
+    #time-series length
+    scalar T = $pd
+    #number of blocks
+    scalar k = ceil(T/l)
+    #number of coefficients
+    scalar nb = $ncoeff
+    scalar nb1 = nb - 1
+    #matrix of bootstrap coefficients
+    matrix bb = zeros(B,nb1)
+    #matrix of Studentized bootstrap statistic
+    matrix tt = zeros(B,nb1)
+    #from series to matrix
+    matrix M = {y}~{X}
+    #from long to wide    
+    matrix MW = zeros(T,rows(M)/T*cols(M))    	# OLD: MW = { }
+    matrix minit = seq(1,n*nb+1,nb)				# initial column position for each loop
+    loop o = 1..n --quiet
+        MW[,minit[o]:minit[o]+nb-1] = M[1+(o-1)*T:o*T,]		# OLD: MW = MW~M[1+(o-1)*T:o*T,]
+    endloop
+    
+    loop q = 1..B --quiet
+        #random block index
+        matrix i = round((T-l)*muniform(k,1))
+        #resampling
+        matrix MBW = { }		# AT: pre-allocate matrix
+        loop o = 1..k --quiet
+            scalar ik = i[o]
+            MBW = MBW | MW[ik+1:ik+l,]
+        endloop        
+        MBW = MBW[1:T,]
+        #demeaning
+        MBW = MBW .- meanc(MBW)
+        #from wide to long	-- AT: here I was able to save A LOT of time!
+        MB = zeros(nT,nb)		# OLD: MB={}       
+        matrix minit = seq(1,nT+1,T)				# initial column position for each loop
+        loop o = 1..n --quiet
+            #MB = MB | MBW[,1+(o-1)*nb:o*nb]		# OLD
+            MB[minit[o]:minit[o]+T-1,] = MBW[,1+(o-1)*nb:o*nb]
+        endloop
+        /* OLD, deprecated
+        #from matrix to series
+        series yy = MB[,1]
+        list xx = null
+        loop o = 2..nb --quiet
+            series xx$o = MB[,o]
+            list xx += xx$o
+        endloop
+        #estimate
+        catch ols yy xx #--quiet
+        #*/
+        # use matrices instead
+        matrix my = MB[,1]
+        matrix mx = MB[,-1]
+        matrix U = {}
+        catch coef = mols(my,mx,&U)        
+        if $error
+            bb[q,] = b
+            matrix u =  MB[,1] - sumr(MB[,2:nb] .* b)
+        else
+            bb[q,] = transp(coef)
+            matrix u =  U
+        endif
+        #scores
+        matrix S = MB[,2:nb] .* u
+        matrix S1 = { }
+        loop o = 1..nb1 --quiet
+            #sum across unit
+            matrix s = sumr(mshape(S[,o],T,n))/n
+            matrix s1 = zeros(k,1)
+            loop m = 1..T --quiet
+                j = int((m-0.5)/l)+1
+                s1[j] += s[m]
+            endloop
+            s1 = s1 / sqrt(l)
+            matrix S1 = S1 ~ s1
+        endloop
+        B1 = (S1'S1)/k	# OLD: (S1'*S1)/k
+        matrix A1 = nT*inv(MB[,2:nb]' MB[,2:nb])
+        matrix C = transp(sqrt(diag(A1*B1*A1)))
+        #absolute value of the Studentized bootstrap statistic
+        tt[q,] = abs(sqrt(T)*((bb[q,]-b)./C))
+    endloop
+    #bootstrap variance estimator
+    matrix se  = sqrt(T)*sdc(bb)
+    #symmetric bootstrap percentile-t confidence intervals
+    matrix ci = { }
+    loop foreach o 0.99 0.95 0.90 --quiet
+        matrix q = quantile(tt,$o)
+        matrix c1 = b - q .* se
+        matrix c2 = b + q .* se
+        matrix ci = ci | c1 | c2
+    endloop
+    #print output
+    printf "\nPanel Moving Blocks Bootstrap (MBB) for linear regression models with fixed effects\n"
+    printf "Bootstrap standard errors and symmetric bootstrap percentile-t confidence intervals\n"
+    printf "For references see: Goncalves, 2011\n"
+    printf "\n  Bootstrap replications: %d\n", B
+    scalar avel = T/k
+    printf "  Average block size: %g\n", avel
+    printf "  \t\t\t\ts.e.\t\t\t1%% CI\t\t\t5%% CI\t\t\t10%% CI\n"
+    printf "  ---------------------------------------------------------------------------------------------------------------------\n"
+    string parnames = strsub(varname(X),","," ")
+    loop for j = 1..nb1 --quiet
+        parname = strsplit(parnames,$j)
+        if strlen(parname) > 5
+            printf "  %s\t", parname
+        else
+            printf "  %s\t\t", parname
+        endif
+        printf "%.10g\t%.10g\t%10.8g %10.8g   %10.8g %10.8g   %10.8g %10.8g\n",b[j],se[j],ci[1,j],ci[2,j],ci[3,j],ci[4,j],ci[5,j],ci[6,j]
+    endloop
+    printf "\n"
+    #set output
+    bundle output
+    output["beta"] = bb
+    output["tstat"] = tt
+    return output
+end function
+
+/*
+#----------
+# EXAMPLE
+#----------
+clear
+set verbose off
+
+include pmbb.gfn# --force
+# Load in a bigger panel data set
+include Threshold_Panel.gfn
+open ThresholdPanel_data_joe99.gdt --frompkg=Threshold_Panel
+setobs 15 1:1 --stacked-time-series
+rename v1 inva
+rename v2 vala
+rename v3 cfa
+rename v4 debta
+series vala2 = vala^2
+series vala3 = vala^3
+series debtval = debta*vala
+list exo = vala vala2 vala3 debta debtval
+list Lall = inva exo
+# Make sure you have a balanced dataset
+smpl Lall --balanced --no-missing
+
+# bootstrap settings
+nboot = 4999
+nblock = 2	# avg. block size
+
+# pmbb 1.6
+set stopwatch
+bundle bb = pmbb(inva,exo,nblock,nboot)
+printf "pmbb16 takes = %.3f sec.\n", $stopwatch
+
+# revamped pmbb
+set stopwatch
+bundle bb = pmbbNEW(inva,exo,nblock,nboot)
+printf "pmbbNEW takes = %.3f sec.\n", $stopwatch
+*/

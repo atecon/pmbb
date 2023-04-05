@@ -1,0 +1,12 @@
+set verbose off
+clear
+
+set assert stop
+
+include "./src/pmbb.inp" --force
+
+
+
+
+print "Finished all tests succesfully."
+quit

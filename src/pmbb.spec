@@ -1,0 +1,10 @@
+author = Giuseppe Vittucci and Artur Tarassow
+email = giuseppe.vittucci@gmail.com
+version = 1.7
+date = 2018-03-24
+description = Moving Blocks Bootstrap (MBB) for linear panels
+tags = C10
+min-version = 2017a
+public = pmbb
+help = pmbb_help.txt
+sample-script = pmbb_sample.inp

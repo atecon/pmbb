@@ -108,7 +108,7 @@ function bundle pmbb (const series y "dependent variable",
     printf "  Average block size: %g\n", T/k
     printf "  \t\tcoefficient\ts.e.\t\t\t1%% CI\t\t\t5%% CI\t\t\t10%% CI\n"
     printf "  ---------------------------------------------------------------------------------------------------------------------\n"
-    loop for j = 1..ncoeff_wo_const --quiet
+    loop j = 1..ncoeff_wo_const
         parname = strsplit(parnames,$j)
         if strlen(parname) > 5
             printf "  %s\t", parname

@@ -107,8 +107,8 @@ function bundle pmbb (const series y "dependent variable",
     printf "Bootstrap standard errors and symmetric bootstrap percentile-t confidence intervals\n"
     printf "\n  No. of bootstrap replications: %d\n", nboot
     printf "  Average block size: %g\n", T/k
-    printf "  \t\tcoefficient\ts.e.\t\t\t1%% CI\t\t\t5%% CI\t\t\t10%% CI\n"
-    printf "  ---------------------------------------------------------------------------------------------------------------------\n"
+    printf "\n  \t\tcoefficient\t  s.e.\t\t1%% CI\t\t\t5%% CI\t\t\t10%% CI\n"
+    printf "  ---------------------------------------------------------------------------------------------------------------\n"
     loop j = 1..ncoeff_wo_const
         parname = strsplit(parnames,$j)
         if strlen(parname) > 5
@@ -116,7 +116,7 @@ function bundle pmbb (const series y "dependent variable",
         else
             printf "  %s\t\t", parname
         endif
-        printf "%8.5f\t%8.5f\t%10.4f %10.4f   %10.4f %10.4f   %10.4f %10.4f\n",
+        printf "%8.5f\t%8.5f  %10.4f %10.4f   %10.4f %10.4f   %10.4f %10.4f\n",
           coeff[j],se[j],ci[1,j],ci[2,j],ci[3,j],ci[4,j],ci[5,j],ci[6,j]
     endloop
     printf "\n"

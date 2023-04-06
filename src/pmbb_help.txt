@@ -12,8 +12,8 @@ MBB is robust to serial correlation (like the standard MBB), but also to
 arbitrary forms of cross sectional dependence.
 
 The simulations carried out in the paper show that the panel MBB performs well
-even when the degree of serial and cross sectional correlation is large, provided
-that the block size is appropriately chosen.
+even when the degree of serial and cross sectional correlation is large,
+provided that the block size is appropriately chosen.
 In the simulations, Goncalves adopts a data-driven approach, with a block size
 equal on average to:
 - 4.4 when T = 25;
@@ -27,10 +27,10 @@ write to giuseppe.vittucci@gmail.com.
 Public function
 ===============
 
-===========================================
+=======================================================
 pmbb(const series y, const list X, int blocksize[1::4],
      int nboot[100::1000], int pseed[0::0])
-===========================================
+=======================================================
 The function computes and shows also the symmetric bootstrap percentile-t
 confidence intervals of the coefficients at the 1%, 5% and 10% significance
 level. The bootstrap percentile-t confidence intervals are calculated as:
@@ -61,8 +61,8 @@ Parameters:
 Returns:
 --------
 The function returns a bundle with:
-- a matrix (beta) containing the vectors of coefficients in each of the bootstrap
-replications;
+- a matrix (beta) containing the vectors of coefficients in each of the
+bootstrap replications;
 - a matrix (tstat) containing the vectors of Studentized bootstrap statistic in
 each replication.
 
@@ -73,7 +73,7 @@ Changelog:
 ==========
 1.8 (April 2023)
 - Rewrite help text and add references
-- Internal refactoring
+- Internal refactoring and optimization
 
 1.7 (March 2018)
 - re-write of the code leads to speed-up by factor 8

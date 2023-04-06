@@ -85,8 +85,9 @@ function bundle pmbb (const series y "dependent variable",
         endloop
 
         B1 = (S1'S1)/k
-        matrix A1 = nT * inv(MB[,2:ncoeff]' MB[,2:ncoeff])
-        matrix C = transp( sqrt(diag(A1*B1*A1)) )
+        matrix A1 = nT * invpd(MB[,2:ncoeff]' MB[,2:ncoeff])
+        matrix mat = qform(A1, B1)
+        matrix C = transp(sqrt(diag(mat)))
 
         tt[q,] = abs(sqrt(T) * ( (bb[q,]-coeff) ./ C) )
     endloop

@@ -5,7 +5,11 @@ set assert stop
 
 include "./src/pmbb.inp" --force
 
+open greene14_1.gdt
+logs C Q PF LF
+list X = l_Q l_PF l_LF
 
+bundle bb = pmbb(l_C, X)
 
 
 print "Finished all tests succesfully."

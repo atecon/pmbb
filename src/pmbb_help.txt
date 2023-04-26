@@ -14,7 +14,7 @@ arbitrary forms of cross sectional dependence.
 The simulations carried out in the paper show that the panel MBB performs well
 even when the degree of serial and cross sectional correlation is large,
 provided that the block size is appropriately chosen.
-In the simulations, Goncalves adopts a data-driven approach, with a block size
+In the simulations, Gonçalves adopts a data-driven approach, with a block size
 equal on average to:
 - 4.4 when T = 25;
 - 7.9 when T = 50;

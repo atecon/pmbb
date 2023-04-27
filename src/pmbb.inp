@@ -1,58 +1,65 @@
-function bundle pmbb (const series y "dependent variable",
-                      const list X "regressors (w/o constant)",
-                      int blocksize[1:50:4] "Length block size",
-                      int nboot[100:50000:1000] "#bootstrap replications",
-                      int pseed[0::0] "seed (0 = none)")
+function bundle pmbb (const series y,
+                      const list X,
+                      int blocksize[1:50:4],
+                      int nboot[100:50000:1000],
+                      int pseed[0::0])
     /* Main function. */
 
     if pseed
         set seed pseed
     endif
 
-    scalar n = max($unit)
-    scalar T = $pd
-    scalar k = ceil(T/blocksize)
+    bundle self = _(blocksize, nboot)
+    scalar self.N = max($unit)
+    scalar self.T = $pd
+    scalar nblocks = ceil(self.T / self.blocksize)
     matrix yX = {y} ~ {X}
-    string parnames = strsub(varname(X),","," ")
+    matrix self.confidence_levels = {0.99, 0.95, 0.90}
 
     panel y 0 X --quiet
 
-    scalar nT = $T
-    matrix coeff = transp($coeff[2:])
+    scalar self.nT = $T
+    matrix self.coeff = $coeff[2:]      # disregard "const"
+    self.parnames = $model.parnames[2:]
+    rnameset(self.coeff, self.parnames)
     scalar ncoeff = $ncoeff
     scalar ncoeff_wo_const = ncoeff - 1
 
-    matrix bb = zeros(nboot, ncoeff_wo_const)
-    matrix tt = zeros(nboot, ncoeff_wo_const)
-    scalar r = rows(yX) / T * cols(yX)
-    matrix MW = zeros(T, r)
-    scalar r = n * ncoeff + 1
+    scalar r = rows(yX) / self.T * cols(yX)
+    scalar r = self.N * ncoeff
     matrix minit = seq(1, r, ncoeff)
+    matrix MW = zeros(self.T, r)
+    matrix self.coeffs = zeros(self.nboot, ncoeff_wo_const)
+    matrix self.tstats = zeros(self.nboot, ncoeff_wo_const)
 
-    loop i = 1..n
+    # From long to wide format
+    loop i=1..self.N
         scalar last = minit[i] + ncoeff - 1
-        MW[,minit[i]:last] = yX[1+(i-1)*T:i*T,]
+        scalar init_yX = 1+(i-1)*self.T
+        MW[,minit[i]:last] = yX[init_yX:i*self.T,]
     endloop
 
-    loop q = 1..nboot
-        matrix MB = zeros(nT, ncoeff)
-        matrix value = round((T - blocksize) * muniform(k, 1))
-        matrix minit = seq(1, nT+1, T)
+    loop q=1..self.nboot
+        matrix MB = zeros(self.nT, ncoeff)
+        matrix randblock = round((self.T - self.blocksize) * \
+                             muniform(nblocks, 1))
+        matrix minit = seq(1, self.nT+1, self.T)
         matrix MBW = {}
         matrix uhat = {}
         matrix S1 = {}
 
-        # TODO: Initializing the rigth dimension of MBW would save time
-        loop i = 1..k
-            scalar tmp = value[i]
-            MBW = MBW | MW[tmp+1:tmp+blocksize,]
+        # TODO: Initializing the right dimension of MBW may save time
+        # Resampling
+        loop i=1..nblocks
+            scalar tmp = randblock[i]
+            MBW = MBW | MW[tmp+1:tmp+self.blocksize,]
         endloop
 
-        MBW = MBW[1:T,]
+        MBW = MBW[1:self.T,]
         MBW = MBW .- meanc(MBW)
 
-        loop i = 1..n
-            scalar endrow = minit[i] + T - 1
+        loop i=1..self.N
+            scalar endrow = minit[i] + self.T - 1
             scalar initcol = 1 + (i-1) * ncoeff
             scalar endcol = i * ncoeff
             MB[minit[i]:endrow,] = MBW[,initcol:endcol]
@@ -61,68 +68,172 @@ function bundle pmbb (const series y "dependent variable",
         matrix my = MB[,1]
         matrix mx = MB[,-1]
 
-        catch coef = mols(my, mx, &uhat)
+        catch bhat = mols(my, mx, &uhat)
+
         if $error
-            bb[q,] = coeff
-            matrix uhat =  MB[,1] - sumr(MB[,2:ncoeff] .* coeff)
+            # in case of an error, rely on the initial point estimate
+            self.coeffs[q,] = self.coeff'
+            matrix uhat =  MB[,1] - sumr(MB[,2:ncoeff] .* self.coeff')
         else
-            bb[q,] = transp(coef)
+            self.coeffs[q,] = transp(bhat)
         endif
 
+        # Scores
         matrix S = MB[,2:ncoeff] .* uhat
 
-        loop o = 1..ncoeff_wo_const
-            matrix s = sumr(mshape(S[,o], T, n)) / n
-            matrix s1 = zeros(k, 1)
+        loop o=1..ncoeff_wo_const
+            matrix s = sumr(mshape(S[,o], self.T, self.N)) / self.N
+            matrix s1 = zeros(nblocks, 1)
 
-            loop m = 1..T
-                scalar j = int((m-0.5) / blocksize) + 1
+            loop m=1..self.T
+                scalar j = int((m-0.5) / self.blocksize) + 1
                 s1[j] += s[m]
             endloop
 
-            s1 = s1 / sqrt(blocksize)
-            S1 ~= s1
+            S1 ~= s1 / sqrt(self.blocksize)
         endloop
 
-        B1 = (S1'S1)/k
-        matrix A1 = nT * invpd(MB[,2:ncoeff]' MB[,2:ncoeff])
+        B1 = (S1'S1) / nblocks
+        matrix A1 = self.nT * invpd(MB[,2:ncoeff]' MB[,2:ncoeff])
         matrix mat = qform(A1, B1)
         matrix C = transp(sqrt(diag(mat)))
 
-        tt[q,] = abs(sqrt(T) * ( (bb[q,]-coeff) ./ C) )
+        # Absolute value of the Studentized bootstrap statistic
+        self.tstats[q,] = abs(sqrt(self.T) * \
+                             ( (self.coeffs[q,] - self.coeff') ./ C) )
     endloop
 
-    matrix se  = sqrt(T) * sdc(bb)
+    matrix self.stderr  = sqrt(self.T) * sdc(self.coeffs)'
+    rnameset(self.stderr, self.parnames)
 
-    matrix ci = { }
-    matrix cilevels = {0.99, 0.95, 0.90}
-    loop i=1..nelem(cilevels)
-        matrix q = quantile(tt, cilevels[i])
-        matrix c1 = coeff - q .* se
-        matrix c2 = coeff + q .* se
-        matrix ci |= c1 | c2
+    bundle ci = confidence_intervals(self,
+                                     self.confidence_levels)
+    bundle self = self + ci
+
+    print_header (self, nblocks)
+    print_results(self)
+
+    return self
+end function
+
+
+function bundle confidence_intervals (const bundle self,
+                                      const matrix confidence_levels)
+    /* Compute confidence intervals of coefficients
+
+    Args:
+        self (bundle): Bundle holding various objects.
+        confidence_levels (matrix): Vector of confidence levels (in the range [0,1]) for which to compute intervals.
+
+    Returns:
+        A bundle containing matrices of confidence intervals for each confidence level. Each matrix has the same number of rows as `coeff`, and 3 columns: the lower bound, the point estimate, and the upper bound, respectively. The keys of the matrices in the bundle have the format "qXX", where "XX" is the confidence level multiplied by 100 (e.g., "q95" for a 95% confidence level).
+
+    Note:
+        The intervals are computed using the formula point_estimate +- t_stat * stddev, where t_stat is the (1-confidence_level/2)-quantile of the bootstrap t-statistics.
+    */
+
+    bundle ret
+
+    loop i=1..nelem(confidence_levels)
+        matrix q = quantile(self.tstats, confidence_levels[i])'
+
+        matrix lower = self.coeff - q .* self.stderr
+        matrix upper = self.coeff + q .* self.stderr
+
+        matrix intervals =  lower ~ upper
+        string key = intval_key_name(confidence_levels[i])
+        cnameset(intervals, defarray("Lower", "Upper"))
+        rnameset(intervals, self.parnames)
+        bundle ret.@key = _(intervals)
     endloop
 
+    return ret
+end function
+
+
+function string intval_key_name (const scalar cilevel)
+    /* Construct a string key for a confidence interval level.
+
+    Args:
+        cilevel (scalar): the confidence interval level, a number between 0 and 1.
+
+    Returns:
+        A string of the form "qXX", where "XX" is the integer representation of 100 times the confidence interval level. This string can be used as a key to store and retrieve the corresponding confidence intervals in a bundle.
+*/
+    return sprintf("q%d", 100*cilevel)
+end function
+
+
+function void print_header (const bundle self,
+                            const scalar nblocks)
     printf "\nPanel Moving Blocks Bootstrap (MBB) for linear regression models with fixed effects\n"
     printf "Bootstrap standard errors and symmetric bootstrap percentile-t confidence intervals\n"
-    printf "\n  No. of bootstrap replications: %d\n", nboot
-    printf "  Average block size: %g\n", T/k
-    printf "\n  \t\tcoefficient\t  s.e.\t\t1%% CI\t\t\t5%% CI\t\t\t10%% CI\n"
-    printf "  ---------------------------------------------------------------------------------------------------------------\n"
-    loop j = 1..ncoeff_wo_const
-        parname = strsplit(parnames,$j)
-        if strlen(parname) > 5
-            printf "  %s\t", parname
-        else
-            printf "  %s\t\t", parname
-        endif
-        printf "%8.5f\t%8.5f  %10.4f %10.4f   %10.4f %10.4f   %10.4f %10.4f\n",
-          coeff[j],se[j],ci[1,j],ci[2,j],ci[3,j],ci[4,j],ci[5,j],ci[6,j]
-    endloop
-    printf "\n"
+    printf "\n  No. of bootstrap replications: %d\n", self.nboot
+    printf "  Average block size: %g\n", (self.T / nblocks)
+end function
 
-    bundle output
-    output["beta"] = bb
-    output["tstat"] = tt
-    return output
+
+function void print_results (const bundle self)
+    /* Print coefficient estimates and confidence intervals. */
+
+    matrix mat = merge_coeff_stderr(self.coeff, self.stderr)
+    printf "\nPoint estimates and bootstrap standard errors:\n"
+    printf "\n%16.5f\n", mat
+
+    matrix mat = merge_intervals(self)
+    print "Bootstrap confidence intervals for different confidence levels:"
+    printf "\n%16.5f\n", mat
+end function
+
+
+function strings append_suffix (const strings str, const string suffix)
+    /* Append a suffix to each string in an array of strings.
+
+    Args:
+        str (strings): an array of strings.
+        suffix (string): the suffix to append to each string in the array.
+
+    Returns:
+        An array of strings where each string has the suffix appended at the end.
+*/
+    strings ret = array(nelem(str))
+
+    loop foreach i str
+        ret[i] = sprintf("%s%s", str[i], suffix)
+    endloop
+
+    return ret
+end function
+
+function matrix merge_intervals (const bundle self)
+    /* Merge horizontally confidence intervals for different levels.
+
+    Args:
+        self (bundle): a bundle containing matrices of confidence intervals for different levels. The keys of the matrices must have the format "qXX", where "XX" is the confidence level multiplied by 100.
+
+    Returns:
+        A matrix where the columns correspond to the different confidence interval levels and the rows correspond to the same coefficients for each level of confidence. The column labels are constructed by concatenating the original column names with the suffix "(qXX)", where "XX" is the integer representation of the corresponding confidence level multiplied by 100. */
+
+    matrix ci = {}
+    strings clabels = array(0)
+
+    loop i=1..nelem(self.confidence_levels)
+        string key = intval_key_name(self.confidence_levels[i])
+        ci ~= self.@key["intervals"]
+
+        clabels += append_suffix(cnameget(self.@key["intervals"]),
+                                 sprintf("(q%d)",
+                                         100*self.confidence_levels[i]))
+    endloop
+    cnameset(ci, clabels)
+
+    return ci
+end function
+
+
+function matrix merge_coeff_stderr (const matrix coeff, const matrix stderr)
+    matrix cs = coeff ~ stderr
+    cnameset(cs, defarray("coefficient", "std. error"))
+
+    return cs
 end function

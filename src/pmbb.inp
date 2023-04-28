@@ -106,9 +106,7 @@ function bundle pmbb (const series y,
     matrix self.stderr  = sqrt(self.T) * sdc(self.coeffs)'
     rnameset(self.stderr, self.parnames)
 
-    bundle ci = confidence_intervals(self,
-                                     self.confidence_levels)
-    bundle self = self + ci
+    confidence_intervals(&self, self.confidence_levels)
 
     print_header (self, nblocks)
     print_results(self)
@@ -117,42 +115,34 @@ function bundle pmbb (const series y,
 end function
 
 
-function bundle confidence_intervals (const bundle self,
-                                      const matrix confidence_levels)
-    /* Compute confidence intervals of coefficients
+function void confidence_intervals (bundle *self,
+                                    const matrix confidence_levels)
+    /* Compute confidence intervals of coefficients. Add matrices to self.
+        Each matrix has the same number of rows as `coeff`, and 2 columns: the lower bound and the upper bound, respectively. The name of the matrices have the format "qXX", where "XX" is the confidence level multiplied by 100 (e.g., "q95" for a 95% confidence level).
 
     Args:
-        self (bundle): Bundle holding various objects.
+        self (bundle): Bundle (in pointer form) holding various objects.
         confidence_levels (matrix): Vector of confidence levels (in the range [0,1]) for which to compute intervals.
-
-    Returns:
-        A bundle containing matrices of confidence intervals for each confidence level. Each matrix has the same number of rows as `coeff`, and 3 columns: the lower bound, the point estimate, and the upper bound, respectively. The keys of the matrices in the bundle have the format "qXX", where "XX" is the confidence level multiplied by 100 (e.g., "q95" for a 95% confidence level).
 
     Note:
         The intervals are computed using the formula point_estimate +- t_stat * stddev, where t_stat is the (1-confidence_level/2)-quantile of the bootstrap t-statistics.
     */
 
-    bundle ret
-
     loop i=1..nelem(confidence_levels)
         matrix q = quantile(self.tstats, confidence_levels[i])'
-
         matrix lower = self.coeff - q .* self.stderr
         matrix upper = self.coeff + q .* self.stderr
 
-        matrix intervals =  lower ~ upper
-        string key = intval_key_name(confidence_levels[i])
-        cnameset(intervals, defarray("Lower", "Upper"))
-        rnameset(intervals, self.parnames)
-        bundle ret.@key = _(intervals)
+        string vname = intval_matrix_name(confidence_levels[i])
+        matrix self.@vname =  lower ~ upper
+        cnameset(self.@vname, defarray("Lower", "Upper"))
+        rnameset(self.@vname, self.parnames)
     endloop
-
-    return ret
 end function
 
 
-function string intval_key_name (const scalar cilevel)
-    /* Construct a string key for a confidence interval level.
+function string intval_matrix_name (const scalar cilevel)
+    /* Construct a string for a confidence interval level.
 
     Args:
         cilevel (scalar): the confidence interval level, a number between 0 and 1.
@@ -218,10 +208,10 @@ function matrix merge_intervals (const bundle self)
     strings clabels = array(0)
 
     loop i=1..nelem(self.confidence_levels)
-        string key = intval_key_name(self.confidence_levels[i])
-        ci ~= self.@key["intervals"]
+        string vname = intval_matrix_name(self.confidence_levels[i])
+        ci ~= self.@vname
 
-        clabels += append_suffix(cnameget(self.@key["intervals"]),
+        clabels += append_suffix(cnameget(self.@vname),
                                  sprintf("(q%d)",
                                          100*self.confidence_levels[i]))
     endloop

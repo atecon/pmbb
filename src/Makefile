@@ -1,7 +1,7 @@
 PKG = pmbb
 
 $(PKG).gfn: $(PKG).inp $(PKG).spec $(PKG)_sample.inp
-	fold -s -w 80 $(PKG)_help.md | tee $(PKG)_help.md
+	# fold -s -w 80 $(PKG)_help.md | tee $(PKG)_help.md
 	gretlcli --makepkg $(PKG).inp
 
 install: $(PKG).gfn

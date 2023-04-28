@@ -10,13 +10,10 @@
 # Introduction
 
 The function implements the panel Moving Blocks Bootstrap (MBB) suggested and
-analysed by Gonçalves, S. (2011, *The moving blocks bootstrap for panel linear
-regression models with individual fixed effects*, Econometric Theory).
+analysed by Gonçalves, S. (2011, *The moving blocks bootstrap for panel linear regression models with individual fixed effects*, Econometric Theory).
 
-The panel MBB is different from the standard MBB of Kunsch (1989, *The 
-jackknife and the Bootstrap for General Stationary Observations*, The Annals of 
-Statistics) and Liu and Singh (1992, *Moving Blocks Jackknife and Bootstrap 
-Capture Weak Dependence*. In: R. Lepage and L. Billard, Eds., Exploring the 
+The panel MBB is different from the standard MBB of Kunsch (1989, *The jackknife and the Bootstrap for General Stationary Observations*, The Annals of
+Statistics) and Liu and Singh (1992, *Moving Blocks Jackknife and Bootstrap Capture Weak Dependence*. In: R. Lepage and L. Billard, Eds., Exploring the
 Limits of Bootstrap, John Wiley, New York), because what is drawn in the 
 resampling is the vector containing the *n* individual observations at each 
 point in time. The panel MBB is robust to serial correlation (like the standard 
@@ -43,8 +40,8 @@ pmbb(const series y, const list X, int blocksize[1::4], int nboot[100::1000],
 
 The function computes and shows also the symmetric bootstrap percentile-t
 confidence intervals of the coefficients at the 1%, 5% and 10% significance
-level. The bootstrap percentile-t confidence intervals are calculated as:
-beta_hat +/- q_alpha x se_beta
+level. The bootstrap percentile-t confidence intervals are calculated as
+$ +/- q_alpha x se_beta
 where:
 
 - beta_hat is the FE estimate of the coefficient;
@@ -89,7 +86,7 @@ estimates for each bootstrap replication
 - `parnames`: strings, Array of regressor names (without intercept)
 - `stderr`: matrix, Column vector of length `k` referring to the standard 
 errors for each coefficient (not shown for intercept coefficient)
-- `tstats`: matrix, `nboot` x `k` matrix holding the Studentized test 
+- `tstats`: matrix, Dimension $nboot \times k$ matrix holding the Studentized test
 statistics for each bootstrap replication
 - `q90`: matrix, Holds the lower and upper bounds (in columns) for each 
 regressor (in rows) for the 90 pct. confidence interval of the coefficient 

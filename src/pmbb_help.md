@@ -1,7 +1,7 @@
 # Introduction
 
 The function implements the panel Moving Blocks Bootstrap (MBB) suggested and
-analysed by Gonçalves, S. (2011, *The moving blocks bootstrap for panel linear regression models with individual fixed effects*, Econometric Theory).
+analysed by Gonçalves, S. (2011, *The moving blocks bootstrap for panel linear regression models with individual fixed effects*, Econometric Theory, https://doi.org/10.1017/S0266466610000630).
 
 The panel MBB is different from the standard MBB of Kunsch (1989, *The jackknife and the Bootstrap for General Stationary Observations*, The Annals of
 Statistics) and Liu and Singh (1992, *Moving Blocks Jackknife and Bootstrap Capture Weak Dependence*. In: R. Lepage and L. Billard, Eds., Exploring the
@@ -88,8 +88,11 @@ estimates.
 
 # Changelog
 
-* **v1.8 (April 2023)**
+* **v2.0 (April 2023)**
+  * Bugfix: Confidence intervals were too large for some coefficients.
+  * Increase minimum version to 2022b
   * Rewrite help text (using Markdown now) and add references
+  * Put further information into the returned bundle
   * Internal refactoring and optimization
 
 * **v1.7 (March 2018)**

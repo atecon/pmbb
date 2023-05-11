@@ -1,7 +1,7 @@
 author = Giuseppe Vittucci and Artur Tarassow
 email = giuseppe.vittucci@gmail.com
-version = 1.8
-date = 2023-04-27
+version = 2.0
+date = 2023-05-11
 description = Moving Blocks Bootstrap (MBB) for linear panels
 tags = C10
 min-version = 2022b
